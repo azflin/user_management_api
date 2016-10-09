@@ -10,7 +10,9 @@ app.config['ERROR_404_HELP'] = False
 db = SQLAlchemy(app)
 api = Api(app)
 
-from resources import UserResource, UserListResource
+from resources import UserResource, UserListResource, GroupResource, GroupListResource
 
 api.add_resource(UserResource, '/users/<int:id>')
 api.add_resource(UserListResource, '/users/')
+api.add_resource(GroupResource, '/groups/<int:id>')
+api.add_resource(GroupListResource, '/groups/')
