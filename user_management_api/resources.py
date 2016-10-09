@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, jsonify
 from flask.ext.restful import Resource, fields, marshal_with, abort
 
 from models import User, Group, db
@@ -17,6 +17,12 @@ group_fields = {
 
 
 class UserResource(Resource):
+    """
+    /users/<int:id>
+    GET: Return details of single user
+    DELETE: Delete user
+    PUT: Edit existing user. JSON payload must contain 'name' and/or 'email' key(s).
+    """
     @marshal_with(user_fields)
     def get(self, id):
         user = User.query.get(id)
@@ -52,6 +58,11 @@ class UserResource(Resource):
 
 
 class UserListResource(Resource):
+    """
+    /users/
+    GET: Return list of users
+    POST: Create a user. JSON payload must contain 'name' and 'email' keys.
+    """
     @marshal_with(user_fields)
     def get(self):
         users = User.query.all()
@@ -72,6 +83,12 @@ class UserListResource(Resource):
 
 
 class GroupResource(Resource):
+    """
+    /groups/<int:id>
+    GET: Return details of single group
+    DELETE: Delete a group
+    PUT: Edit existing group. JSON payload must contain 'name'
+    """
     @marshal_with(group_fields)
     def get(self, id):
         group = Group.query.get(id)
@@ -104,6 +121,11 @@ class GroupResource(Resource):
 
 
 class GroupListResource(Resource):
+    """
+    /groups/
+    GET: Return list of groups
+    POST: Create a group. JSON payload must contain 'name' key
+    """
     @marshal_with(group_fields)
     def get(self):
         groups = Group.query.all()
@@ -121,3 +143,59 @@ class GroupListResource(Resource):
             return new_group, 201
         else:
             abort(400, message="Bad validation - missing name.")
+
+
+class UserGroupsResource(Resource):
+    """
+    /users/<int:id>/groups
+    GET: Return groups of a single user
+    """
+    @marshal_with(group_fields)
+    def get(self, id):
+        user = User.query.get(id)
+        if not user:
+            abort(404, message="User {} doesn't exist".format(id))
+        return user.groups
+
+
+class GroupUsersResource(Resource):
+    """
+    /groups/<int:id>/users
+    GET: Return users of a single group
+    POST: Add or remove an existing user from group.
+        Add: Use JSON payload of {"add": <user_id>}
+        Remove: Use JSON payload of {"remove": <user_id>}
+    """
+    @marshal_with(user_fields)
+    def get(self, id):
+        group = Group.query.get(id)
+        if not group:
+            abort(404, message="Group {} doesn't exist.".format(id))
+        return group.users.all()
+
+    def post(self, id):
+        group = Group.query.get(id)
+        if not group:
+            abort(404, message="Group {} doesn't exist.".format(id))
+        payload = request.get_json()
+        if not payload:
+            abort(400, message="Must use JSON.")
+        if 'add' not in payload and 'remove' not in payload:
+            abort(400, message="Bad validation - payload must contain 'add' or 'remove' key.")
+        if 'add' in payload:
+            user = User.query.get(payload['add'])
+            if not user:
+                abort(404, message="User {} doesn't exist.".format(payload['add']))
+            group.users.append(user)
+            db.session.commit()
+            return jsonify(message="User {} added to group {}.".format(payload['add'], id))
+        elif 'remove' in payload:
+            user = User.query.get(payload['remove'])
+            if not user:
+                abort(404, message="User {} doesn't exist.".format(payload['remove']))
+            user_in_group = group.users.filter_by(id=payload['remove']).first()
+            if not user_in_group:
+                abort(400, message="User {} is not in group {}.".format(payload['remove'], id))
+            group.users.remove(user_in_group)
+            db.session.commit()
+            return jsonify(message="User {} removed from group {}.".format(payload['remove'], id))
