@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from flask.ext.restful import Resource, fields, marshal_with, abort, marshal
+from flask_restful import Resource, fields, marshal_with, abort, marshal
 
 from models import User, Group, db
 
