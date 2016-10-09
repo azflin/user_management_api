@@ -14,8 +14,8 @@ from resources import UserResource, UserListResource, GroupResource, GroupListRe
     UserGroupsResource, GroupUsersResource
 
 api.add_resource(UserResource, '/users/<int:id>')
-api.add_resource(UserListResource, '/users/')
+api.add_resource(UserListResource, '/users')
 api.add_resource(GroupResource, '/groups/<int:id>')
-api.add_resource(GroupListResource, '/groups/')
+api.add_resource(GroupListResource, '/groups')
 api.add_resource(UserGroupsResource, '/users/<int:id>/groups')
 api.add_resource(GroupUsersResource, '/groups/<int:id>/users')

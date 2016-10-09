@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from flask.ext.restful import Resource, fields, marshal_with, abort
+from flask.ext.restful import Resource, fields, marshal_with, abort, marshal
 
 from models import User, Group, db
 
@@ -59,14 +59,24 @@ class UserResource(Resource):
 
 class UserListResource(Resource):
     """
-    /users/
-    GET: Return list of users
+    /users
+    GET: If no query params, return list of users sorted alphabetically by name.
+        If the query parameter 'sortByNumGroups=true' is sent, then return list of users and a
+        number of groups that users belongs to, sorted by number of groups in ascending order.
     POST: Create a user. JSON payload must contain 'name' and 'email' keys.
     """
-    @marshal_with(user_fields)
     def get(self):
-        users = User.query.all()
-        return users
+        if request.args.get('sortByNumGroups') == 'true':
+            users = User.query.all()
+            for user in users:
+                user.num_groups = len(user.groups)
+            users.sort(key=lambda x: x.num_groups)
+            user_fields_with_num_groups = user_fields.copy()
+            user_fields_with_num_groups['num_groups'] = fields.Integer
+            return marshal(users, user_fields_with_num_groups)
+        else:
+            users = User.query.order_by(User.name).all()
+            return marshal(users, user_fields)
 
     @marshal_with(user_fields)
     def post(self):
@@ -122,14 +132,24 @@ class GroupResource(Resource):
 
 class GroupListResource(Resource):
     """
-    /groups/
-    GET: Return list of groups
+    /groups
+    GET: If no query params, return list of groups sorted alphabetically by name.
+        If the query parameter 'sortByNumUsers=true' is sent, then return list of groups and a
+        number of users that group has, sorted by number of users in descending order.
     POST: Create a group. JSON payload must contain 'name' key
     """
-    @marshal_with(group_fields)
     def get(self):
-        groups = Group.query.all()
-        return groups
+        if request.args.get('sortByNumUsers') == 'true':
+            groups = Group.query.all()
+            for group in groups:
+                group.num_users = len(group.users.all())
+            groups.sort(key=lambda x: x.num_users, reverse=True)
+            group_fields_with_num_users = group_fields.copy()
+            group_fields_with_num_users['num_users'] = fields.Integer
+            return marshal(groups, group_fields_with_num_users)
+        else:
+            groups = Group.query.order_by(Group.name).all()
+            return marshal(groups, group_fields)
 
     @marshal_with(group_fields)
     def post(self):
@@ -183,13 +203,17 @@ class GroupUsersResource(Resource):
         if 'add' not in payload and 'remove' not in payload:
             abort(400, message="Bad validation - payload must contain 'add' or 'remove' key.")
         if 'add' in payload:
+            # Check if user exists and that user doesn't already exist in the group
             user = User.query.get(payload['add'])
             if not user:
                 abort(404, message="User {} doesn't exist.".format(payload['add']))
+            if group.users.filter_by(id=payload['add']).first():
+                abort(400, message="User already exists in this group.")
             group.users.append(user)
             db.session.commit()
             return jsonify(message="User {} added to group {}.".format(payload['add'], id))
         elif 'remove' in payload:
+            # Check that user exists and user is in the group
             user = User.query.get(payload['remove'])
             if not user:
                 abort(404, message="User {} doesn't exist.".format(payload['remove']))
