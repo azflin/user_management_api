@@ -3,7 +3,7 @@ from flask_restful import Resource, fields, marshal_with, abort, marshal
 
 from models import User, Group, db
 
-
+# Fields we want to serialize SQLAlchemy objects with
 user_fields = {
     'id': fields.Integer,
     'name': fields.String,
